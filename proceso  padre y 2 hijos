@@ -1,0 +1,69 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main() {
+    int pipe1[2], pipe2[2];
+    pid_t pid1, pid2;
+    char buffer[100];
+
+    // Crear los dos pipes
+    if (pipe(pipe1) == -1 || pipe(pipe2) == -1) {
+        perror("Error al crear pipe");
+        exit(EXIT_FAILURE);
+    }
+
+    // Crear primer hijo
+    pid1 = fork();
+    if (pid1 < 0) {
+        perror("Error en fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid1 == 0) {  
+        // === HIJO 1 ===
+        close(pipe1[1]); // Cierra escritura, solo lee
+        read(pipe1[0], buffer, sizeof(buffer));
+        printf("Hijo 1 recibió: %s\n", buffer);
+        close(pipe1[0]);
+        exit(EXIT_SUCCESS);
+    }
+
+    // Crear segundo hijo
+    pid2 = fork();
+    if (pid2 < 0) {
+        perror("Error en fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid2 == 0) {  
+        // === HIJO 2 ===
+        close(pipe2[1]); // Cierra escritura, solo lee
+        read(pipe2[0], buffer, sizeof(buffer));
+        printf("Hijo 2 recibió: %s\n", buffer);
+        close(pipe2[0]);
+        exit(EXIT_SUCCESS);
+    }
+
+    // === PADRE ===
+    close(pipe1[0]); // No leerá del pipe1
+    close(pipe2[0]); // No leerá del pipe2
+
+    char *mensaje1 = "Hola hijo 1, soy tu padre";
+    char *mensaje2 = "Hola hijo 2, aquí tu padre";
+
+    write(pipe1[1], mensaje1, strlen(mensaje1) + 1);
+    write(pipe2[1], mensaje2, strlen(mensaje2) + 1);
+
+    close(pipe1[1]); // Cierra escritura después de enviar
+    close(pipe2[1]);
+
+    // Esperar a los hijos
+    wait(NULL);
+    wait(NULL);
+
+    printf("Padre: todos los procesos terminaron correctamente.\n");
+    return 0;
+}
